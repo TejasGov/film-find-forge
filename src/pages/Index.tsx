@@ -230,6 +230,7 @@ const Index = () => {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onSearch={searchMovie}
+            apiKey={OMDB_API_KEY}
           />
         </div>
 
