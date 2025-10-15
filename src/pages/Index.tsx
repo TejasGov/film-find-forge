@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
 // API Keys - Replace with your own
-const OMDB_API_KEY = "YOUR_OMDB_API_KEY"; // Get from http://www.omdbapi.com/apikey.aspx
-const YOUTUBE_API_KEY = "YOUR_YOUTUBE_API_KEY"; // Get from https://console.cloud.google.com/
+const OMDB_API_KEY = "2d39236c";
+const YOUTUBE_API_KEY = "AIzaSyBX3z4AqKkxQcb0cu2zJPysfBBpIFbDmb4";
 
 interface Movie {
   Title: string;
