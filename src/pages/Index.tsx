@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Film, BookmarkCheck } from "lucide-react";
+import { Film, BookmarkCheck, Home, Lightbulb } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { MovieCard } from "@/components/MovieCard";
 import { TrailerModal } from "@/components/TrailerModal";
+import { SuggestionsQuiz } from "@/components/SuggestionsQuiz";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -43,6 +44,9 @@ const Index = () => {
   const [region, setRegion] = useState<string>("hollywood");
   const [loadingTopMovies, setLoadingTopMovies] = useState(true);
   const [hoveredMovieId, setHoveredMovieId] = useState<string | null>(null);
+  const [showSuggestionsQuiz, setShowSuggestionsQuiz] = useState(false);
+  const [suggestedMovies, setSuggestedMovies] = useState<Movie[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();
 
   const regionSearchTerms: Record<string, string[]> = {
@@ -273,6 +277,91 @@ const Index = () => {
     setShowWatchlist(false);
   };
 
+  const handleSuggestionsSubmit = async (answers: Record<string, string>) => {
+    setShowSuggestionsQuiz(false);
+    setShowWatchlist(false);
+    setCurrentMovie(null);
+
+    const genreMap: Record<string, string[]> = {
+      "Action": ["action", "adventure"],
+      "Drama": ["drama"],
+      "Comedy": ["comedy"],
+      "Thriller": ["thriller", "crime"],
+      "Sci-Fi": ["sci-fi", "science fiction"],
+      "Romance": ["romance"],
+    };
+
+    const moodMap: Record<string, string[]> = {
+      "Feel-Good": ["comedy", "family", "animation"],
+      "Intense": ["thriller", "action", "crime"],
+      "Thought-Provoking": ["drama", "mystery"],
+      "Scary": ["horror"],
+      "Romantic": ["romance"],
+    };
+
+    const searchTerms = [];
+
+    if (answers.genre) {
+      const genres = genreMap[answers.genre] || [answers.genre.toLowerCase()];
+      searchTerms.push(genres[0]);
+    }
+
+    if (answers.mood && !searchTerms.includes(moodMap[answers.mood]?.[0])) {
+      const moods = moodMap[answers.mood] || [answers.mood.toLowerCase()];
+      searchTerms.push(moods[0]);
+    }
+
+    const yearMap: Record<string, string> = {
+      "Classic (Pre-2000)": "1990",
+      "2000s": "2005",
+      "2010s": "2015",
+      "2020s": "2022",
+    };
+
+    if (answers.era && yearMap[answers.era]) {
+      searchTerms.push(`${yearMap[answers.era]}`);
+    }
+
+    const movies: Movie[] = [];
+    const searchQueries = searchTerms.length > 0
+      ? searchTerms
+      : ["best movies", "top rated", "award winning"];
+
+    try {
+      for (const query of searchQueries) {
+        if (movies.length >= 3) break;
+
+        const response = await fetch(
+          `https://www.omdbapi.com/?s=${encodeURIComponent(query)}&type=movie&apikey=${OMDB_API_KEY}`
+        );
+        const data = await response.json();
+
+        if (data.Search) {
+          for (const result of data.Search) {
+            if (movies.length >= 3) break;
+            const detailResponse = await fetch(
+              `https://www.omdbapi.com/?i=${result.imdbID}&apikey=${OMDB_API_KEY}`
+            );
+            const detailData = await detailResponse.json();
+            if (detailData.Poster && detailData.Poster !== "N/A") {
+              movies.push(detailData);
+            }
+          }
+        }
+      }
+
+      setSuggestedMovies(movies);
+      setShowSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching suggestions:", error);
+      toast({
+        title: "Error",
+        description: "Could not fetch suggestions",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
@@ -285,14 +374,36 @@ const Index = () => {
                 CineSearch
               </h1>
             </div>
-            <Button
-              onClick={loadWatchlist}
-              variant="secondary"
-              className="hover:bg-secondary/80"
-            >
-              <BookmarkCheck className="w-5 h-5 mr-2" />
-              My Watchlist
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => {
+                  setCurrentMovie(null);
+                  setShowWatchlist(false);
+                  setShowSuggestions(false);
+                }}
+                variant="outline"
+                size="sm"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                Home
+              </Button>
+              <Button
+                onClick={() => setShowSuggestionsQuiz(true)}
+                variant="outline"
+                size="sm"
+              >
+                <Lightbulb className="w-4 h-4 mr-2" />
+                Suggestions
+              </Button>
+              <Button
+                onClick={loadWatchlist}
+                variant="secondary"
+                size="sm"
+              >
+                <BookmarkCheck className="w-4 h-4 mr-2" />
+                My Watchlist
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -412,6 +523,25 @@ const Index = () => {
             </div>
           </div>
         )}
+
+        {/* Suggestions Section */}
+        {showSuggestions && suggestedMovies.length > 0 && (
+          <div>
+            <h2 className="text-3xl font-bold mb-6 text-center animate-fade-in">
+              Your Recommendations
+            </h2>
+            <div className="grid gap-6 max-w-5xl mx-auto">
+              {suggestedMovies.map((movie) => (
+                <MovieCard
+                  key={movie.imdbID}
+                  movie={movie}
+                  onAddToWatchlist={addToWatchlist}
+                  onViewTrailer={() => searchTrailer(movie.Title)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Trailer Modal */}
@@ -429,6 +559,14 @@ const Index = () => {
         movieTitle={trailerModal.movieTitle}
         fallbackUrl={trailerModal.fallbackUrl}
       />
+
+      {/* Suggestions Quiz Modal */}
+      {showSuggestionsQuiz && (
+        <SuggestionsQuiz
+          onClose={() => setShowSuggestionsQuiz(false)}
+          onSubmit={handleSuggestionsSubmit}
+        />
+      )}
     </div>
   );
 };
