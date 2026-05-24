@@ -56,31 +56,8 @@ const Index = () => {
   };
 
   useEffect(() => {
-    const detectLocationAndFetchMovies = async () => {
-      try {
-        const geoResponse = await fetch("https://ipapi.co/json/");
-        const geoData = await geoResponse.json();
-        const country = geoData.country_code?.toUpperCase() || "US";
-        console.log("Detected country:", country);
-
-        let detectedRegion = "hollywood";
-        if (["IN"].includes(country)) {
-          detectedRegion = "bollywood";
-        } else if (["ES", "MX", "AR", "CO", "PE", "CL"].includes(country)) {
-          detectedRegion = "spanish";
-        }
-
-        console.log("Detected region:", detectedRegion);
-        setRegion(detectedRegion);
-        await fetchTopMoviesByRegion(detectedRegion);
-      } catch (error) {
-        console.error("Geolocation failed, defaulting to Hollywood:", error);
-        setRegion("hollywood");
-        await fetchTopMoviesByRegion("hollywood");
-      }
-    };
-
-    detectLocationAndFetchMovies();
+    setRegion("hollywood");
+    fetchTopMoviesByRegion("hollywood");
   }, []);
 
   const fetchTopMoviesByRegion = async (selectedRegion: string) => {
@@ -89,7 +66,6 @@ const Index = () => {
     const movies: Movie[] = [];
 
     try {
-      console.log("Fetching movies for region:", selectedRegion, "with terms:", searchTerms);
       for (const term of searchTerms) {
         if (movies.length >= 10) break;
 
@@ -97,7 +73,6 @@ const Index = () => {
           `https://www.omdbapi.com/?s=${encodeURIComponent(term)}&type=movie&apikey=${OMDB_API_KEY}`
         );
         const data = await response.json();
-        console.log("Search results for", term, ":", data);
 
         if (data.Search && data.Search.length > 0) {
           const result = data.Search[0];
@@ -105,14 +80,12 @@ const Index = () => {
             `https://www.omdbapi.com/?i=${result.imdbID}&apikey=${OMDB_API_KEY}`
           );
           const detailData = await detailResponse.json();
-          console.log("Movie details:", detailData.Title, "Poster:", detailData.Poster);
           if (detailData.Poster && detailData.Poster !== "N/A") {
             movies.push(detailData);
           }
         }
       }
 
-      console.log("Final movies to display:", movies);
       setTopMovies(movies);
     } catch (error) {
       console.error("Error fetching top movies:", error);
