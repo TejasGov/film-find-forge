@@ -94,17 +94,15 @@ const Index = () => {
         const data = await response.json();
         console.log("Search results for", term, ":", data);
 
-        if (data.Search) {
-          for (const result of data.Search) {
-            if (movies.length >= 6) break;
-            const detailResponse = await fetch(
-              `https://www.omdbapi.com/?i=${result.imdbID}&apikey=${OMDB_API_KEY}`
-            );
-            const detailData = await detailResponse.json();
-            console.log("Movie details:", detailData.Title, "Poster:", detailData.Poster);
-            if (detailData.Poster && detailData.Poster !== "N/A") {
-              movies.push(detailData);
-            }
+        if (data.Search && data.Search.length > 0) {
+          const result = data.Search[0];
+          const detailResponse = await fetch(
+            `https://www.omdbapi.com/?i=${result.imdbID}&apikey=${OMDB_API_KEY}`
+          );
+          const detailData = await detailResponse.json();
+          console.log("Movie details:", detailData.Title, "Poster:", detailData.Poster);
+          if (detailData.Poster && detailData.Poster !== "N/A") {
+            movies.push(detailData);
           }
         }
       }
