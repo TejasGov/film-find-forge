@@ -1,14 +1,16 @@
-import { useState } from "react";
-import { Film, BookmarkCheck } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Film, BookmarkCheck, Home, Lightbulb } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { MovieCard } from "@/components/MovieCard";
 import { TrailerModal } from "@/components/TrailerModal";
+import { SuggestionsQuiz } from "@/components/SuggestionsQuiz";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
 // API Keys - Replace with your own
 const OMDB_API_KEY = "2d39236c";
 const YOUTUBE_API_KEY = "AIzaSyBX3z4AqKkxQcb0cu2zJPysfBBpIFbDmb4";
+const GROQ_API_KEY = "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";
 
 interface Movie {
   Title: string;
@@ -23,6 +25,11 @@ interface Movie {
   imdbID: string;
 }
 
+interface TopMoviesGridProps {
+  movies: Movie[];
+  onMovieClick: (movie: Movie) => void;
+}
+
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentMovie, setCurrentMovie] = useState<Movie | null>(null);
@@ -34,7 +41,59 @@ const Index = () => {
     movieTitle: "",
     fallbackUrl: undefined as string | undefined,
   });
+  const [topMovies, setTopMovies] = useState<Movie[]>([]);
+  const [region, setRegion] = useState<string>("hollywood");
+  const [loadingTopMovies, setLoadingTopMovies] = useState(true);
+  const [hoveredMovieId, setHoveredMovieId] = useState<string | null>(null);
+  const [showSuggestionsQuiz, setShowSuggestionsQuiz] = useState(false);
+  const [suggestedMovies, setSuggestedMovies] = useState<Movie[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();
+
+  const regionSearchTerms: Record<string, string[]> = {
+    bollywood: ["Kabali", "Bahubali", "3 Idiots", "Dangal", "PK", "Lagaan", "Rang De Basanti", "Dilwale", "Sholay", "Padmaavat"],
+    spanish: ["Pan's Labyrinth", "The Orphanage", "Parasite", "The Secret of Marrowbone", "Carmen", "Backbeat", "A Pigeon Sat on a Branch", "Todo Sobre Mi Madre", "Y Tu Mama Tambien", "The Skin I Live In"],
+    hollywood: ["Inception", "The Dark Knight", "Oppenheimer", "Dune", "Avatar", "Interstellar", "Fight Club", "Pulp Fiction", "Titanic", "Forrest Gump"],
+  };
+
+  useEffect(() => {
+    setRegion("hollywood");
+    fetchTopMoviesByRegion("hollywood");
+  }, []);
+
+  const fetchTopMoviesByRegion = async (selectedRegion: string) => {
+    setLoadingTopMovies(true);
+    const searchTerms = regionSearchTerms[selectedRegion] || regionSearchTerms.hollywood;
+    const movies: Movie[] = [];
+
+    try {
+      for (const term of searchTerms) {
+        if (movies.length >= 10) break;
+
+        const response = await fetch(
+          `https://www.omdbapi.com/?s=${encodeURIComponent(term)}&type=movie&apikey=${OMDB_API_KEY}`
+        );
+        const data = await response.json();
+
+        if (data.Search && data.Search.length > 0) {
+          const result = data.Search[0];
+          const detailResponse = await fetch(
+            `https://www.omdbapi.com/?i=${result.imdbID}&apikey=${OMDB_API_KEY}`
+          );
+          const detailData = await detailResponse.json();
+          if (detailData.Poster && detailData.Poster !== "N/A") {
+            movies.push(detailData);
+          }
+        }
+      }
+
+      setTopMovies(movies);
+    } catch (error) {
+      console.error("Error fetching top movies:", error);
+    } finally {
+      setLoadingTopMovies(false);
+    }
+  };
 
   const searchMovie = async () => {
     if (!searchQuery.trim()) {
@@ -187,6 +246,95 @@ const Index = () => {
     }
   };
 
+  const handleTopMovieClick = (movie: Movie) => {
+    setCurrentMovie(movie);
+    setShowWatchlist(false);
+  };
+
+  const handleSuggestionsSubmit = async (answers: Record<string, string>) => {
+    setShowSuggestionsQuiz(false);
+    setShowWatchlist(false);
+    setCurrentMovie(null);
+
+    try {
+      const prompt = `Based on these user preferences, recommend exactly 3 specific movie titles (not franchises, just movie names). Return ONLY the movie titles, one per line, with nothing else.
+
+User Preferences:
+- Genre: ${answers.genre || "Any"}
+- Mood: ${answers.mood || "Any"}
+- Duration: ${answers.duration || "Any"}
+- Era: ${answers.era || "Any"}
+- Language/Region: ${answers.language || "Any"}
+- Pace: ${answers.pace || "Any"}
+- Content Rating: ${answers.rating || "Any"}
+- Setting: ${answers.setting || "Any"}
+- Themes: ${answers.themes || "Any"}
+- Protagonist: ${answers.protagonist || "Any"}
+
+Return 3 movie titles, one per line:`;
+
+      const groqResponse = await fetch("https://api.groq.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "mixtral-8x7b-32768",
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 200,
+        }),
+      });
+
+      const groqData = await groqResponse.json();
+
+      if (!groqResponse.ok) {
+        console.error("Groq API error:", groqData);
+        throw new Error(groqData.error?.message || "Groq API error");
+      }
+
+      if (!groqData.choices || !groqData.choices[0]?.message?.content) {
+        console.error("Invalid Groq response structure:", groqData);
+        throw new Error("Invalid response from AI");
+      }
+
+      const aiSuggestions = groqData.choices[0].message.content
+        .split("\n")
+        .map((title: string) => title.trim())
+        .filter((title: string) => title.length > 0)
+        .slice(0, 3);
+
+      const movies: Movie[] = [];
+
+      for (const movieTitle of aiSuggestions) {
+        const response = await fetch(
+          `https://www.omdbapi.com/?t=${encodeURIComponent(movieTitle)}&apikey=${OMDB_API_KEY}`
+        );
+        const data = await response.json();
+
+        if (data.Response === "True" && data.Poster && data.Poster !== "N/A") {
+          movies.push(data);
+        }
+      }
+
+      setSuggestedMovies(movies);
+      setShowSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching AI suggestions:", error);
+      toast({
+        title: "Error",
+        description: "Could not fetch suggestions",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
@@ -199,14 +347,36 @@ const Index = () => {
                 CineSearch
               </h1>
             </div>
-            <Button
-              onClick={loadWatchlist}
-              variant="secondary"
-              className="hover:bg-secondary/80"
-            >
-              <BookmarkCheck className="w-5 h-5 mr-2" />
-              My Watchlist
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => {
+                  setCurrentMovie(null);
+                  setShowWatchlist(false);
+                  setShowSuggestions(false);
+                }}
+                variant="outline"
+                size="sm"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                Home
+              </Button>
+              <Button
+                onClick={() => setShowSuggestionsQuiz(true)}
+                variant="outline"
+                size="sm"
+              >
+                <Lightbulb className="w-4 h-4 mr-2" />
+                Suggestions
+              </Button>
+              <Button
+                onClick={loadWatchlist}
+                variant="secondary"
+                size="sm"
+              >
+                <BookmarkCheck className="w-4 h-4 mr-2" />
+                My Watchlist
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -233,6 +403,67 @@ const Index = () => {
             apiKey={OMDB_API_KEY}
           />
         </div>
+
+        {/* Top Movies Section */}
+        {!showWatchlist && !currentMovie && !showSuggestions && topMovies.length > 0 && (
+          <div className="mb-16">
+            <h3 className="text-3xl font-bold mb-8 text-center animate-fade-in">
+              Trending Now
+            </h3>
+            <div
+              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4"
+              style={{ perspective: "1000px" }}
+            >
+              {topMovies.map((movie) => (
+                <div
+                  key={movie.imdbID}
+                  className="cursor-pointer"
+                  onMouseEnter={() => setHoveredMovieId(movie.imdbID)}
+                  onMouseLeave={() => setHoveredMovieId(null)}
+                  onClick={() => handleTopMovieClick(movie)}
+                >
+                  <div
+                    className="relative overflow-hidden rounded-lg shadow-lg transition-all duration-300"
+                    style={{
+                      aspectRatio: "2/3",
+                      transform: hoveredMovieId === movie.imdbID
+                        ? "rotateY(-15deg) rotateX(10deg) scale(1.1)"
+                        : "rotateY(0) rotateX(0) scale(1)",
+                      opacity: hoveredMovieId !== null && hoveredMovieId !== movie.imdbID ? 0.1 : 1,
+                      transformStyle: "preserve-3d" as any,
+                      zIndex: hoveredMovieId === movie.imdbID ? 10 : 1,
+                    }}
+                  >
+                    {movie.Poster && movie.Poster !== "N/A" ? (
+                      <img
+                        src={movie.Poster}
+                        alt={movie.Title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                        <span className="text-muted-foreground">No poster</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                      <h4 className="font-bold text-white text-sm mb-1 line-clamp-2">
+                        {movie.Title}
+                      </h4>
+                      <p className="text-xs text-gray-200">
+                        {movie.Year} • {movie.imdbRating}/10
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {!showWatchlist && !currentMovie && !showSuggestions && loadingTopMovies && (
+          <div className="mb-16 text-center">
+            <p className="text-muted-foreground">Loading trending movies...</p>
+          </div>
+        )}
 
         {/* Results Section */}
         {!showWatchlist && currentMovie && (
@@ -265,6 +496,25 @@ const Index = () => {
             </div>
           </div>
         )}
+
+        {/* Suggestions Section */}
+        {showSuggestions && suggestedMovies.length > 0 && (
+          <div>
+            <h2 className="text-3xl font-bold mb-6 text-center animate-fade-in">
+              Your Recommendations
+            </h2>
+            <div className="grid gap-6 max-w-5xl mx-auto">
+              {suggestedMovies.map((movie) => (
+                <MovieCard
+                  key={movie.imdbID}
+                  movie={movie}
+                  onAddToWatchlist={addToWatchlist}
+                  onViewTrailer={() => searchTrailer(movie.Title)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Trailer Modal */}
@@ -282,6 +532,14 @@ const Index = () => {
         movieTitle={trailerModal.movieTitle}
         fallbackUrl={trailerModal.fallbackUrl}
       />
+
+      {/* Suggestions Quiz Modal */}
+      {showSuggestionsQuiz && (
+        <SuggestionsQuiz
+          onClose={() => setShowSuggestionsQuiz(false)}
+          onSubmit={handleSuggestionsSubmit}
+        />
+      )}
     </div>
   );
 };
