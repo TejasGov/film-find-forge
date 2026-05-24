@@ -272,27 +272,37 @@ const Index = () => {
       "Romantic": ["romance"],
     };
 
-    const searchTerms = [];
+    let searchTerms: string[] = [];
 
-    if (answers.genre) {
-      const genres = genreMap[answers.genre] || [answers.genre.toLowerCase()];
-      searchTerms.push(genres[0]);
-    }
+    // Use region-specific movies based on language preference
+    if (answers.language === "Bollywood") {
+      searchTerms = regionSearchTerms.bollywood.slice(0, 5);
+    } else if (answers.language === "Spanish") {
+      searchTerms = regionSearchTerms.spanish.slice(0, 5);
+    } else if (answers.language === "Hollywood") {
+      searchTerms = regionSearchTerms.hollywood.slice(0, 5);
+    } else {
+      // For "International" or "Any", use a mix
+      if (answers.genre) {
+        const genres = genreMap[answers.genre] || [answers.genre.toLowerCase()];
+        searchTerms.push(genres[0]);
+      }
 
-    if (answers.mood && !searchTerms.includes(moodMap[answers.mood]?.[0])) {
-      const moods = moodMap[answers.mood] || [answers.mood.toLowerCase()];
-      searchTerms.push(moods[0]);
-    }
+      if (answers.mood && !searchTerms.includes(moodMap[answers.mood]?.[0])) {
+        const moods = moodMap[answers.mood] || [answers.mood.toLowerCase()];
+        searchTerms.push(moods[0]);
+      }
 
-    const yearMap: Record<string, string> = {
-      "Classic (Pre-2000)": "1990",
-      "2000s": "2005",
-      "2010s": "2015",
-      "2020s": "2022",
-    };
+      const yearMap: Record<string, string> = {
+        "Classic (Pre-2000)": "1990",
+        "2000s": "2005",
+        "2010s": "2015",
+        "2020s": "2022",
+      };
 
-    if (answers.era && yearMap[answers.era]) {
-      searchTerms.push(`${yearMap[answers.era]}`);
+      if (answers.era && yearMap[answers.era]) {
+        searchTerms.push(`${yearMap[answers.era]}`);
+      }
     }
 
     const movies: Movie[] = [];
@@ -309,16 +319,14 @@ const Index = () => {
         );
         const data = await response.json();
 
-        if (data.Search) {
-          for (const result of data.Search) {
-            if (movies.length >= 3) break;
-            const detailResponse = await fetch(
-              `https://www.omdbapi.com/?i=${result.imdbID}&apikey=${OMDB_API_KEY}`
-            );
-            const detailData = await detailResponse.json();
-            if (detailData.Poster && detailData.Poster !== "N/A") {
-              movies.push(detailData);
-            }
+        if (data.Search && data.Search.length > 0) {
+          const result = data.Search[0];
+          const detailResponse = await fetch(
+            `https://www.omdbapi.com/?i=${result.imdbID}&apikey=${OMDB_API_KEY}`
+          );
+          const detailData = await detailResponse.json();
+          if (detailData.Poster && detailData.Poster !== "N/A") {
+            movies.push(detailData);
           }
         }
       }
