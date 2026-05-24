@@ -42,12 +42,13 @@ const Index = () => {
   const [topMovies, setTopMovies] = useState<Movie[]>([]);
   const [region, setRegion] = useState<string>("hollywood");
   const [loadingTopMovies, setLoadingTopMovies] = useState(true);
+  const [hoveredMovieId, setHoveredMovieId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const regionSearchTerms: Record<string, string[]> = {
-    bollywood: ["Kabali", "Bahubali", "3 Idiots", "Dangal", "PK", "Lagaan"],
-    spanish: ["Pan's Labyrinth", "The Orphanage", "Parasite", "Almodovar", "Spanish cinema", "El Ministerio del Tiempo"],
-    hollywood: ["Inception", "The Dark Knight", "Oppenheimer", "Dune", "Avatar", "Interstellar"],
+    bollywood: ["Kabali", "Bahubali", "3 Idiots", "Dangal", "PK", "Lagaan", "Rang De Basanti", "Dilwale", "Sholay", "Padmaavat"],
+    spanish: ["Pan's Labyrinth", "The Orphanage", "Parasite", "The Secret of Marrowbone", "Carmen", "Backbeat", "A Pigeon Sat on a Branch", "Todo Sobre Mi Madre", "Y Tu Mama Tambien", "The Skin I Live In"],
+    hollywood: ["Inception", "The Dark Knight", "Oppenheimer", "Dune", "Avatar", "Interstellar", "Fight Club", "Pulp Fiction", "Titanic", "Forrest Gump"],
   };
 
   useEffect(() => {
@@ -86,7 +87,7 @@ const Index = () => {
     try {
       console.log("Fetching movies for region:", selectedRegion, "with terms:", searchTerms);
       for (const term of searchTerms) {
-        if (movies.length >= 6) break;
+        if (movies.length >= 10) break;
 
         const response = await fetch(
           `https://www.omdbapi.com/?s=${encodeURIComponent(term)}&type=movie&apikey=${OMDB_API_KEY}`
@@ -325,30 +326,46 @@ const Index = () => {
             <h3 className="text-3xl font-bold mb-8 text-center animate-fade-in">
               Trending Now
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div
+              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4"
+              style={{ perspective: "1000px" }}
+            >
               {topMovies.map((movie) => (
                 <div
                   key={movie.imdbID}
-                  className="group cursor-pointer transform transition-transform hover:scale-105"
+                  className="cursor-pointer"
+                  onMouseEnter={() => setHoveredMovieId(movie.imdbID)}
+                  onMouseLeave={() => setHoveredMovieId(null)}
                   onClick={() => handleTopMovieClick(movie)}
                 >
-                  <div className="relative overflow-hidden rounded-lg shadow-lg">
+                  <div
+                    className="relative overflow-hidden rounded-lg shadow-lg transition-all duration-300"
+                    style={{
+                      aspectRatio: "2/3",
+                      transform: hoveredMovieId === movie.imdbID
+                        ? "rotateY(-15deg) rotateX(10deg) scale(1.1)"
+                        : "rotateY(0) rotateX(0) scale(1)",
+                      opacity: hoveredMovieId !== null && hoveredMovieId !== movie.imdbID ? 0.1 : 1,
+                      transformStyle: "preserve-3d" as any,
+                      zIndex: hoveredMovieId === movie.imdbID ? 10 : 1,
+                    }}
+                  >
                     {movie.Poster && movie.Poster !== "N/A" ? (
                       <img
                         src={movie.Poster}
                         alt={movie.Title}
-                        className="w-full h-80 object-cover group-hover:opacity-90 transition-opacity"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-80 bg-muted flex items-center justify-center">
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
                         <span className="text-muted-foreground">No poster</span>
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                      <h4 className="font-bold text-white text-lg mb-1">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                      <h4 className="font-bold text-white text-sm mb-1 line-clamp-2">
                         {movie.Title}
                       </h4>
-                      <p className="text-sm text-gray-200">
+                      <p className="text-xs text-gray-200">
                         {movie.Year} • {movie.imdbRating}/10
                       </p>
                     </div>
