@@ -273,7 +273,7 @@ User Preferences:
 
 Return 3 movie titles, one per line:`;
 
-      const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const groqResponse = await fetch("https://api.groq.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${GROQ_API_KEY}`,
@@ -293,6 +293,17 @@ Return 3 movie titles, one per line:`;
       });
 
       const groqData = await groqResponse.json();
+
+      if (!groqResponse.ok) {
+        console.error("Groq API error:", groqData);
+        throw new Error(groqData.error?.message || "Groq API error");
+      }
+
+      if (!groqData.choices || !groqData.choices[0]?.message?.content) {
+        console.error("Invalid Groq response structure:", groqData);
+        throw new Error("Invalid response from AI");
+      }
+
       const aiSuggestions = groqData.choices[0].message.content
         .split("\n")
         .map((title: string) => title.trim())
