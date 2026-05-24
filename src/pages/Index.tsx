@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 // API Keys - Replace with your own
 const OMDB_API_KEY = "2d39236c";
 const YOUTUBE_API_KEY = "AIzaSyBX3z4AqKkxQcb0cu2zJPysfBBpIFbDmb4";
+const GROQ_API_KEY = "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";
 
 interface Movie {
   Title: string;
@@ -255,86 +256,66 @@ const Index = () => {
     setShowWatchlist(false);
     setCurrentMovie(null);
 
-    const genreMap: Record<string, string[]> = {
-      "Action": ["action", "adventure"],
-      "Drama": ["drama"],
-      "Comedy": ["comedy"],
-      "Thriller": ["thriller", "crime"],
-      "Sci-Fi": ["sci-fi", "science fiction"],
-      "Romance": ["romance"],
-    };
-
-    const moodMap: Record<string, string[]> = {
-      "Feel-Good": ["comedy", "family", "animation"],
-      "Intense": ["thriller", "action", "crime"],
-      "Thought-Provoking": ["drama", "mystery"],
-      "Scary": ["horror"],
-      "Romantic": ["romance"],
-    };
-
-    let searchTerms: string[] = [];
-
-    // Use region-specific movies based on language preference
-    if (answers.language === "Bollywood") {
-      searchTerms = regionSearchTerms.bollywood.slice(0, 5);
-    } else if (answers.language === "Spanish") {
-      searchTerms = regionSearchTerms.spanish.slice(0, 5);
-    } else if (answers.language === "Hollywood") {
-      searchTerms = regionSearchTerms.hollywood.slice(0, 5);
-    } else {
-      // For "International" or "Any", use a mix
-      if (answers.genre) {
-        const genres = genreMap[answers.genre] || [answers.genre.toLowerCase()];
-        searchTerms.push(genres[0]);
-      }
-
-      if (answers.mood && !searchTerms.includes(moodMap[answers.mood]?.[0])) {
-        const moods = moodMap[answers.mood] || [answers.mood.toLowerCase()];
-        searchTerms.push(moods[0]);
-      }
-
-      const yearMap: Record<string, string> = {
-        "Classic (Pre-2000)": "1990",
-        "2000s": "2005",
-        "2010s": "2015",
-        "2020s": "2022",
-      };
-
-      if (answers.era && yearMap[answers.era]) {
-        searchTerms.push(`${yearMap[answers.era]}`);
-      }
-    }
-
-    const movies: Movie[] = [];
-    const searchQueries = searchTerms.length > 0
-      ? searchTerms
-      : ["best movies", "top rated", "award winning"];
-
     try {
-      for (const query of searchQueries) {
-        if (movies.length >= 3) break;
+      const prompt = `Based on these user preferences, recommend exactly 3 specific movie titles (not franchises, just movie names). Return ONLY the movie titles, one per line, with nothing else.
 
+User Preferences:
+- Genre: ${answers.genre || "Any"}
+- Mood: ${answers.mood || "Any"}
+- Duration: ${answers.duration || "Any"}
+- Era: ${answers.era || "Any"}
+- Language/Region: ${answers.language || "Any"}
+- Pace: ${answers.pace || "Any"}
+- Content Rating: ${answers.rating || "Any"}
+- Setting: ${answers.setting || "Any"}
+- Themes: ${answers.themes || "Any"}
+- Protagonist: ${answers.protagonist || "Any"}
+
+Return 3 movie titles, one per line:`;
+
+      const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "mixtral-8x7b-32768",
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 200,
+        }),
+      });
+
+      const groqData = await groqResponse.json();
+      const aiSuggestions = groqData.choices[0].message.content
+        .split("\n")
+        .map((title: string) => title.trim())
+        .filter((title: string) => title.length > 0)
+        .slice(0, 3);
+
+      const movies: Movie[] = [];
+
+      for (const movieTitle of aiSuggestions) {
         const response = await fetch(
-          `https://www.omdbapi.com/?s=${encodeURIComponent(query)}&type=movie&apikey=${OMDB_API_KEY}`
+          `https://www.omdbapi.com/?t=${encodeURIComponent(movieTitle)}&apikey=${OMDB_API_KEY}`
         );
         const data = await response.json();
 
-        if (data.Search && data.Search.length > 0) {
-          const result = data.Search[0];
-          const detailResponse = await fetch(
-            `https://www.omdbapi.com/?i=${result.imdbID}&apikey=${OMDB_API_KEY}`
-          );
-          const detailData = await detailResponse.json();
-          if (detailData.Poster && detailData.Poster !== "N/A") {
-            movies.push(detailData);
-          }
+        if (data.Response === "True" && data.Poster && data.Poster !== "N/A") {
+          movies.push(data);
         }
       }
 
       setSuggestedMovies(movies);
       setShowSuggestions(true);
     } catch (error) {
-      console.error("Error fetching suggestions:", error);
+      console.error("Error fetching AI suggestions:", error);
       toast({
         title: "Error",
         description: "Could not fetch suggestions",
