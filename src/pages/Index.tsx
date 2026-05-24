@@ -1,494 +1,238 @@
 import { useState, useEffect } from "react";
-import { Film, BookmarkCheck, Home, Lightbulb } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { MovieCard } from "@/components/MovieCard";
 import { TrailerModal } from "@/components/TrailerModal";
 import { SuggestionsQuiz } from "@/components/SuggestionsQuiz";
-import { Button } from "@/components/ui/button";
+import { TrendingGrid } from "@/components/TrendingGrid";
 import { useToast } from "@/hooks/use-toast";
-
-// API Keys - Replace with your own
-const OMDB_API_KEY = "2d39236c";
-const YOUTUBE_API_KEY = "AIzaSyBX3z4AqKkxQcb0cu2zJPysfBBpIFbDmb4";
-const GROQ_API_KEY = "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";
-
-interface Movie {
-  Title: string;
-  Poster: string;
-  imdbRating: string;
-  Year: string;
-  Rated: string;
-  Runtime: string;
-  Genre: string;
-  Plot: string;
-  Actors: string;
-  imdbID: string;
-}
-
-interface TopMoviesGridProps {
-  movies: Movie[];
-  onMovieClick: (movie: Movie) => void;
-}
+import { useWatchlist } from "@/hooks/use-watchlist";
+import { useTrailer } from "@/hooks/use-trailer";
+import { fetchMovieByTitle, fetchMoviesByTerms, searchMoviesLive } from "@/services/omdb";
+import { getMovieSuggestions, getTrendingMovies } from "@/services/groq";
+import { getUserLocation } from "@/services/location";
+import { OMDB_API_KEY } from "@/lib/config";
+import type { Movie } from "@/types/movie";
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentMovie, setCurrentMovie] = useState<Movie | null>(null);
-  const [watchlist, setWatchlist] = useState<Movie[]>([]);
-  const [showWatchlist, setShowWatchlist] = useState(false);
-  const [trailerModal, setTrailerModal] = useState({
-    isOpen: false,
-    videoId: null as string | null,
-    movieTitle: "",
-    fallbackUrl: undefined as string | undefined,
-  });
   const [topMovies, setTopMovies] = useState<Movie[]>([]);
-  const [region, setRegion] = useState<string>("hollywood");
   const [loadingTopMovies, setLoadingTopMovies] = useState(true);
-  const [hoveredMovieId, setHoveredMovieId] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState("Hollywood");
+  
+  // Live Search States
+  const [searchResults, setSearchResults] = useState<Movie[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSearchingLoading, setIsSearchingLoading] = useState(false);
   const [showSuggestionsQuiz, setShowSuggestionsQuiz] = useState(false);
   const [suggestedMovies, setSuggestedMovies] = useState<Movie[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const { toast } = useToast();
 
-  const regionSearchTerms: Record<string, string[]> = {
-    bollywood: ["Kabali", "Bahubali", "3 Idiots", "Dangal", "PK", "Lagaan", "Rang De Basanti", "Dilwale", "Sholay", "Padmaavat"],
-    spanish: ["Pan's Labyrinth", "The Orphanage", "Parasite", "The Secret of Marrowbone", "Carmen", "Backbeat", "A Pigeon Sat on a Branch", "Todo Sobre Mi Madre", "Y Tu Mama Tambien", "The Skin I Live In"],
-    hollywood: ["Inception", "The Dark Knight", "Oppenheimer", "Dune", "Avatar", "Interstellar", "Fight Club", "Pulp Fiction", "Titanic", "Forrest Gump"],
-  };
+  const { toast } = useToast();
+  const { watchlist, showWatchlist, setShowWatchlist, addToWatchlist, loadWatchlist, removeFromWatchlist } = useWatchlist();
+  const { trailerModal, openTrailer, closeTrailer } = useTrailer();
 
   useEffect(() => {
-    setRegion("hollywood");
-    fetchTopMoviesByRegion("hollywood");
+    getUserLocation()
+      .then((location) => {
+        setUserLocation(location);
+        return getTrendingMovies(location);
+      })
+      .then(titles => fetchMoviesByTerms(titles))
+      .then(setTopMovies)
+      .catch(() => {})
+      .finally(() => setLoadingTopMovies(false));
   }, []);
 
-  const fetchTopMoviesByRegion = async (selectedRegion: string) => {
-    setLoadingTopMovies(true);
-    const searchTerms = regionSearchTerms[selectedRegion] || regionSearchTerms.hollywood;
-    const movies: Movie[] = [];
-
-    try {
-      for (const term of searchTerms) {
-        if (movies.length >= 10) break;
-
-        const response = await fetch(
-          `https://www.omdbapi.com/?s=${encodeURIComponent(term)}&type=movie&apikey=${OMDB_API_KEY}`
-        );
-        const data = await response.json();
-
-        if (data.Search && data.Search.length > 0) {
-          const result = data.Search[0];
-          const detailResponse = await fetch(
-            `https://www.omdbapi.com/?i=${result.imdbID}&apikey=${OMDB_API_KEY}`
-          );
-          const detailData = await detailResponse.json();
-          if (detailData.Poster && detailData.Poster !== "N/A") {
-            movies.push(detailData);
-          }
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchQuery.trim().length > 2) {
+        setIsSearching(true);
+        setIsSearchingLoading(true);
+        setCurrentMovie(null); // Close detail view if open
+        setShowWatchlist(false);
+        try {
+          const results = await searchMoviesLive(searchQuery);
+          setSearchResults(results);
+        } catch {
+          setSearchResults([]);
+        } finally {
+          setIsSearchingLoading(false);
         }
+      } else {
+        setIsSearching(false);
+        setSearchResults([]);
       }
+    }, 400);
 
-      setTopMovies(movies);
-    } catch (error) {
-      console.error("Error fetching top movies:", error);
-    } finally {
-      setLoadingTopMovies(false);
-    }
-  };
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const searchMovie = async () => {
     if (!searchQuery.trim()) {
-      toast({
-        title: "Please enter a movie title",
-        variant: "destructive",
-      });
+      toast({ title: "Please enter a movie title", variant: "destructive" });
       return;
     }
-
     try {
-      const response = await fetch(
-        `https://www.omdbapi.com/?t=${encodeURIComponent(searchQuery)}&apikey=${OMDB_API_KEY}`
-      );
-      const data = await response.json();
-
-      if (data.Response === "True") {
-        setCurrentMovie(data);
+      const movie = await fetchMovieByTitle(searchQuery);
+      if (movie) {
+        setCurrentMovie(movie);
         setShowWatchlist(false);
       } else {
-        toast({
-          title: "Movie not found",
-          description: "Please try a different title",
-          variant: "destructive",
-        });
+        toast({ title: "Movie not found", description: "Please try a different title", variant: "destructive" });
         setCurrentMovie(null);
       }
-    } catch (error) {
-      toast({
-        title: "Error fetching movie",
-        description: "Please check your API key and try again",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Error fetching movie", description: "Please check your API key and try again", variant: "destructive" });
     }
-  };
-
-  const addToWatchlist = () => {
-    if (!currentMovie) return;
-
-    const existingWatchlist = JSON.parse(localStorage.getItem("watchlist") || "[]");
-    
-    if (existingWatchlist.includes(currentMovie.imdbID)) {
-      toast({
-        title: "Already in watchlist",
-        description: `${currentMovie.Title} is already in your watchlist`,
-      });
-      return;
-    }
-
-    const updatedWatchlist = [...existingWatchlist, currentMovie.imdbID];
-    localStorage.setItem("watchlist", JSON.stringify(updatedWatchlist));
-    
-    toast({
-      title: "Added to watchlist",
-      description: `${currentMovie.Title} has been added to your watchlist`,
-    });
-  };
-
-  const loadWatchlist = async () => {
-    const watchlistIds = JSON.parse(localStorage.getItem("watchlist") || "[]");
-    
-    if (watchlistIds.length === 0) {
-      toast({
-        title: "Watchlist is empty",
-        description: "Start adding movies to your watchlist",
-      });
-      return;
-    }
-
-    const movies = await Promise.all(
-      watchlistIds.map(async (id: string) => {
-        const response = await fetch(
-          `https://www.omdbapi.com/?i=${id}&apikey=${OMDB_API_KEY}`
-        );
-        return response.json();
-      })
-    );
-
-    setWatchlist(movies);
-    setCurrentMovie(null);
-    setShowWatchlist(true);
-  };
-
-  const removeFromWatchlist = (imdbID: string) => {
-    const existingWatchlist = JSON.parse(localStorage.getItem("watchlist") || "[]");
-    const updatedWatchlist = existingWatchlist.filter((id: string) => id !== imdbID);
-    localStorage.setItem("watchlist", JSON.stringify(updatedWatchlist));
-    
-    setWatchlist(watchlist.filter(movie => movie.imdbID !== imdbID));
-    
-    toast({
-      title: "Removed from watchlist",
-      description: "Movie has been removed from your watchlist",
-    });
-  };
-
-  const searchTrailer = async (movieTitle: string) => {
-    try {
-      const searchResponse = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${encodeURIComponent(
-          movieTitle + " official trailer"
-        )}&type=video&key=${YOUTUBE_API_KEY}`
-      );
-      const searchData = await searchResponse.json();
-
-      if (searchData.items && searchData.items.length > 0) {
-        // Check each video for embeddability
-        for (const item of searchData.items) {
-          const videoId = item.id.videoId;
-          const videoResponse = await fetch(
-            `https://www.googleapis.com/youtube/v3/videos?part=status&id=${videoId}&key=${YOUTUBE_API_KEY}`
-          );
-          const videoData = await videoResponse.json();
-
-          if (
-            videoData.items &&
-            videoData.items[0]?.status?.embeddable === true
-          ) {
-            setTrailerModal({
-              isOpen: true,
-              videoId,
-              movieTitle,
-              fallbackUrl: undefined,
-            });
-            return;
-          }
-        }
-
-        // No embeddable video found, show fallback
-        const fallbackVideoId = searchData.items[0].id.videoId;
-        setTrailerModal({
-          isOpen: true,
-          videoId: null,
-          movieTitle,
-          fallbackUrl: `https://www.youtube.com/watch?v=${fallbackVideoId}`,
-        });
-      } else {
-        toast({
-          title: "Trailer not found",
-          description: "No trailer available for this movie",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error loading trailer",
-        description: "Please check your YouTube API key",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleTopMovieClick = (movie: Movie) => {
-    setCurrentMovie(movie);
-    setShowWatchlist(false);
   };
 
   const handleSuggestionsSubmit = async (answers: Record<string, string>) => {
     setShowSuggestionsQuiz(false);
     setShowWatchlist(false);
     setCurrentMovie(null);
-
     try {
-      const prompt = `Based on these user preferences, recommend exactly 3 specific movie titles (not franchises, just movie names). Return ONLY the movie titles, one per line, with nothing else.
-
-User Preferences:
-- Genre: ${answers.genre || "Any"}
-- Mood: ${answers.mood || "Any"}
-- Duration: ${answers.duration || "Any"}
-- Era: ${answers.era || "Any"}
-- Language/Region: ${answers.language || "Any"}
-- Pace: ${answers.pace || "Any"}
-- Content Rating: ${answers.rating || "Any"}
-- Setting: ${answers.setting || "Any"}
-- Themes: ${answers.themes || "Any"}
-- Protagonist: ${answers.protagonist || "Any"}
-
-Return 3 movie titles, one per line:`;
-
-      const groqResponse = await fetch("https://api.groq.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${GROQ_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "mixtral-8x7b-32768",
-          messages: [
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 200,
-        }),
-      });
-
-      const groqData = await groqResponse.json();
-
-      if (!groqResponse.ok) {
-        console.error("Groq API error:", groqData);
-        throw new Error(groqData.error?.message || "Groq API error");
-      }
-
-      if (!groqData.choices || !groqData.choices[0]?.message?.content) {
-        console.error("Invalid Groq response structure:", groqData);
-        throw new Error("Invalid response from AI");
-      }
-
-      const aiSuggestions = groqData.choices[0].message.content
-        .split("\n")
-        .map((title: string) => title.trim())
-        .filter((title: string) => title.length > 0)
-        .slice(0, 3);
-
+      const titles = await getMovieSuggestions(answers);
       const movies: Movie[] = [];
-
-      for (const movieTitle of aiSuggestions) {
-        const response = await fetch(
-          `https://www.omdbapi.com/?t=${encodeURIComponent(movieTitle)}&apikey=${OMDB_API_KEY}`
-        );
-        const data = await response.json();
-
-        if (data.Response === "True" && data.Poster && data.Poster !== "N/A") {
-          movies.push(data);
-        }
+      for (const title of titles) {
+        const movie = await fetchMovieByTitle(title);
+        if (movie && movie.Poster !== "N/A") movies.push(movie);
       }
-
       setSuggestedMovies(movies);
       setShowSuggestions(true);
-    } catch (error) {
-      console.error("Error fetching AI suggestions:", error);
-      toast({
-        title: "Error",
-        description: "Could not fetch suggestions",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Error", description: "Could not fetch suggestions", variant: "destructive" });
     }
   };
 
+  const goHome = () => {
+    setCurrentMovie(null);
+    setShowWatchlist(false);
+    setShowSuggestions(false);
+    setSearchQuery("");
+    setIsSearching(false);
+  };
+
+  const showHome = !showWatchlist && !currentMovie && !showSuggestions && !isSearching;
+
   return (
-    <div className="min-h-screen bg-gradient-hero">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4">
+      <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-white/5">
+        <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Film className="w-8 h-8 text-primary" />
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                CineSearch
-              </h1>
+            <div className="flex items-center gap-0.5 cursor-pointer select-none" onClick={goHome}>
+              <span className="text-2xl font-black text-primary tracking-tight">CINE</span>
+              <span className="text-2xl font-black text-foreground tracking-tight">SEARCH</span>
             </div>
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => {
-                  setCurrentMovie(null);
-                  setShowWatchlist(false);
-                  setShowSuggestions(false);
-                }}
-                variant="outline"
-                size="sm"
+            <nav className="flex items-center gap-6">
+              <button
+                onClick={goHome}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                <Home className="w-4 h-4 mr-2" />
                 Home
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={() => setShowSuggestionsQuiz(true)}
-                variant="outline"
-                size="sm"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                <Lightbulb className="w-4 h-4 mr-2" />
                 Suggestions
-              </Button>
-              <Button
-                onClick={loadWatchlist}
-                variant="secondary"
-                size="sm"
+              </button>
+              <button
+                onClick={() => { setCurrentMovie(null); loadWatchlist(); }}
+                className="text-sm font-semibold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-5 py-2 rounded-full transition-all"
               >
-                <BookmarkCheck className="w-4 h-4 mr-2" />
-                My Watchlist
-              </Button>
-            </div>
+                My List
+              </button>
+            </nav>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-12">
-        {/* Search Section */}
-        <div className="mb-12">
-          <div className="text-center mb-8">
-            <h2 className="text-5xl font-bold mb-4 animate-fade-in">
-              Discover Your Next{" "}
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Favorite Movie
-              </span>
-            </h2>
-            <p className="text-xl text-muted-foreground animate-slide-up">
-              Search millions of movies, TV series, and dramas
-            </p>
-          </div>
+      {/* Hero */}
+      <section className={`relative text-center px-6 transition-all duration-500 overflow-hidden ${isSearching ? 'py-8' : 'py-24'}`}>
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at 50% 0%, hsla(0,87%,46%,0.09) 0%, transparent 65%)" }}
+        />
+        
+        <div className={`transition-all duration-500 ${isSearching ? 'opacity-0 h-0 overflow-hidden scale-95' : 'opacity-100 scale-100 mb-10'}`}>
+          <h2 className="relative text-6xl md:text-7xl font-black tracking-tight mb-4 leading-tight">
+            Find Your Next{" "}
+            <span className="text-primary">Obsession</span>
+          </h2>
+          <p className="relative text-base text-muted-foreground">
+            Search millions of movies, series, and dramas
+          </p>
+        </div>
+
+        <div className="relative">
           <SearchBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onSearch={searchMovie}
-            apiKey={OMDB_API_KEY}
           />
         </div>
+      </section>
 
-        {/* Top Movies Section */}
-        {!showWatchlist && !currentMovie && !showSuggestions && topMovies.length > 0 && (
-          <div className="mb-16">
-            <h3 className="text-3xl font-bold mb-8 text-center animate-fade-in">
-              Trending Now
-            </h3>
-            <div
-              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4"
-              style={{ perspective: "1000px" }}
-            >
-              {topMovies.map((movie) => (
-                <div
-                  key={movie.imdbID}
-                  className="cursor-pointer"
-                  onMouseEnter={() => setHoveredMovieId(movie.imdbID)}
-                  onMouseLeave={() => setHoveredMovieId(null)}
-                  onClick={() => handleTopMovieClick(movie)}
-                >
-                  <div
-                    className="relative overflow-hidden rounded-lg shadow-lg transition-all duration-300"
-                    style={{
-                      aspectRatio: "2/3",
-                      transform: hoveredMovieId === movie.imdbID
-                        ? "rotateY(-15deg) rotateX(10deg) scale(1.1)"
-                        : "rotateY(0) rotateX(0) scale(1)",
-                      opacity: hoveredMovieId !== null && hoveredMovieId !== movie.imdbID ? 0.1 : 1,
-                      transformStyle: "preserve-3d" as any,
-                      zIndex: hoveredMovieId === movie.imdbID ? 10 : 1,
-                    }}
-                  >
-                    {movie.Poster && movie.Poster !== "N/A" ? (
-                      <img
-                        src={movie.Poster}
-                        alt={movie.Title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-muted flex items-center justify-center">
-                        <span className="text-muted-foreground">No poster</span>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                      <h4 className="font-bold text-white text-sm mb-1 line-clamp-2">
-                        {movie.Title}
-                      </h4>
-                      <p className="text-xs text-gray-200">
-                        {movie.Year} • {movie.imdbRating}/10
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {!showWatchlist && !currentMovie && !showSuggestions && loadingTopMovies && (
-          <div className="mb-16 text-center">
-            <p className="text-muted-foreground">Loading trending movies...</p>
+      {/* Content */}
+      <div className="container mx-auto px-6 pb-20">
+        {isSearching && !currentMovie && (
+          <div className="animate-fade-in">
+            {isSearchingLoading ? (
+              <div className="text-center py-20">
+                <p className="text-muted-foreground text-sm">Searching...</p>
+              </div>
+            ) : searchResults.length > 0 ? (
+              <TrendingGrid
+                title={`Search Results for "${searchQuery}"`}
+                movies={searchResults}
+                onMovieClick={(movie) => { setCurrentMovie(movie); setIsSearching(false); }}
+              />
+            ) : (
+              <div className="text-center py-20">
+                <p className="text-muted-foreground text-sm">No results found for "{searchQuery}"</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Results Section */}
+        {showHome && topMovies.length > 0 && (
+          <TrendingGrid
+            title={`Trending Now in ${userLocation}`}
+            movies={topMovies}
+            onMovieClick={(movie) => { setCurrentMovie(movie); setShowWatchlist(false); }}
+          />
+        )}
+        {showHome && loadingTopMovies && (
+          <div className="text-center py-20">
+            <p className="text-muted-foreground text-sm">Loading trending movies...</p>
+          </div>
+        )}
+
         {!showWatchlist && currentMovie && (
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-5xl mx-auto animate-fade-in">
             <MovieCard
               movie={currentMovie}
-              onAddToWatchlist={addToWatchlist}
-              onViewTrailer={() => searchTrailer(currentMovie.Title)}
+              onAddToWatchlist={() => addToWatchlist(currentMovie)}
+              onViewTrailer={() => openTrailer(currentMovie.Title)}
             />
           </div>
         )}
 
-        {/* Watchlist Section */}
         {showWatchlist && watchlist.length > 0 && (
           <div>
-            <h2 className="text-3xl font-bold mb-6 text-center animate-fade-in">
-              My Watchlist
+            <h2 className="text-xl font-bold mb-8 flex items-center gap-3 animate-fade-in">
+              <span className="w-1 h-5 bg-primary rounded-full" />
+              My List
             </h2>
-            <div className="grid gap-6 max-w-5xl mx-auto">
+            <div className="grid gap-4 max-w-5xl mx-auto">
               {watchlist.map((movie) => (
                 <MovieCard
                   key={movie.imdbID}
                   movie={movie}
                   onAddToWatchlist={() => {}}
-                  onViewTrailer={() => searchTrailer(movie.Title)}
+                  onViewTrailer={() => openTrailer(movie.Title)}
                   showRemove
                   onRemove={() => removeFromWatchlist(movie.imdbID)}
                 />
@@ -497,43 +241,34 @@ Return 3 movie titles, one per line:`;
           </div>
         )}
 
-        {/* Suggestions Section */}
         {showSuggestions && suggestedMovies.length > 0 && (
           <div>
-            <h2 className="text-3xl font-bold mb-6 text-center animate-fade-in">
-              Your Recommendations
+            <h2 className="text-xl font-bold mb-8 flex items-center gap-3 animate-fade-in">
+              <span className="w-1 h-5 bg-primary rounded-full" />
+              Recommended for You
             </h2>
-            <div className="grid gap-6 max-w-5xl mx-auto">
+            <div className="grid gap-4 max-w-5xl mx-auto">
               {suggestedMovies.map((movie) => (
                 <MovieCard
                   key={movie.imdbID}
                   movie={movie}
-                  onAddToWatchlist={addToWatchlist}
-                  onViewTrailer={() => searchTrailer(movie.Title)}
+                  onAddToWatchlist={() => addToWatchlist(movie)}
+                  onViewTrailer={() => openTrailer(movie.Title)}
                 />
               ))}
             </div>
           </div>
         )}
-      </main>
+      </div>
 
-      {/* Trailer Modal */}
       <TrailerModal
         isOpen={trailerModal.isOpen}
-        onClose={() =>
-          setTrailerModal({
-            isOpen: false,
-            videoId: null,
-            movieTitle: "",
-            fallbackUrl: undefined,
-          })
-        }
+        onClose={closeTrailer}
         videoId={trailerModal.videoId}
         movieTitle={trailerModal.movieTitle}
         fallbackUrl={trailerModal.fallbackUrl}
       />
 
-      {/* Suggestions Quiz Modal */}
       {showSuggestionsQuiz && (
         <SuggestionsQuiz
           onClose={() => setShowSuggestionsQuiz(false)}
