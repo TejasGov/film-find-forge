@@ -1,73 +1,60 @@
-# Welcome to your Lovable project
+# CineSearch (Film Find Forge)
 
-## Project info
+> *"My sister and I always had trouble deciding what to watch on movie nights. We'd scroll for hours, argue about genres, and eventually just give up or watch the same thing we always do. So, we thought: let's do this. Let's build something that actually helps you decide."* — *Tejas Govind*
 
-**URL**: https://lovable.dev/projects/53b11327-3d82-4c5b-991e-c56e33cf5a90
+CineSearch is a modern, AI-powered movie discovery platform designed to eliminate the endless scroll and help you find exactly what you're in the mood for.
 
-## How can I edit this code?
+## 🍿 Features
 
-There are several ways of editing your application.
+- **Netflix-Style Live Grid Search**: No clunky suggestion dropdowns. Just start typing, and the entire page instantly transforms into a live grid of movie posters matching your query.
+- **AI-Powered Suggestions Quiz**: Don't know what you want to watch? Take the Suggestions Quiz! Answer a few quick questions about your mood, preferred pacing, era, and genres, and our Groq-powered AI will generate 3 highly specific, hand-picked recommendations just for you.
+- **Localized Trending Movies**: The "Trending Now" home page isn't just a static list. The app detects your location dynamically via IP and asks the AI to curate a custom list of 10 movies currently trending in *your* specific country's cinema market.
+- **Rich Movie Details**: Powered by the OMDB API, every movie card includes high-quality posters, IMDb ratings, runtime, plot summaries, and cast information.
+- **Watch Trailers Instantly**: Hooked up to the YouTube API, you can watch the trailer for any movie without ever leaving the page.
+- **Personal Watchlist**: Save movies to your personalized "My List" to watch later.
 
-**Use Lovable**
+## 💻 Tech Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/53b11327-3d82-4c5b-991e-c56e33cf5a90) and start prompting.
+- **Frontend Framework**: React + Vite
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Icons**: Lucide React
+- **Routing**: React Router DOM
+- **Data Fetching**: `@tanstack/react-query`
+- **APIs Used**:
+  - **OMDB API**: Movie metadata and posters
+  - **Groq API (`llama-3.3-70b-versatile`)**: Lightning-fast AI movie recommendations and localized trending logic
+  - **GeoJS**: IP-based location detection
+  - **YouTube Data API**: Trailer fetching
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🚀 Getting Started
 
-**Use your preferred IDE**
+### Prerequisites
+You will need Node.js & npm installed.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Clone the repository:
+   ```sh
+   git clone <YOUR_GIT_URL>
+   cd film-find-forge
+   ```
 
-Follow these steps:
+2. Install the dependencies:
+   ```sh
+   npm install
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3. Set up your environment variables. Create a `.env` file or configure `src/lib/config.ts` with your API keys:
+   - `OMDB_API_KEY`
+   - `YOUTUBE_API_KEY`
+   - `GROQ_API_KEY`
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+4. Start the development server:
+   ```sh
+   npm run dev
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+5. Open your browser and navigate to `http://localhost:8080/`.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/53b11327-3d82-4c5b-991e-c56e33cf5a90) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 🛠️ How to Contribute
+Want to help make movie nights even better? Feel free to fork the repository and submit a pull request!
