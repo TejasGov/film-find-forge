@@ -405,7 +405,7 @@ const Index = () => {
         </div>
 
         {/* Top Movies Section */}
-        {!showWatchlist && !currentMovie && topMovies.length > 0 && (
+        {!showWatchlist && !currentMovie && !showSuggestions && topMovies.length > 0 && (
           <div className="mb-16">
             <h3 className="text-3xl font-bold mb-8 text-center animate-fade-in">
               Trending Now
@@ -459,7 +459,7 @@ const Index = () => {
             </div>
           </div>
         )}
-        {!showWatchlist && !currentMovie && loadingTopMovies && (
+        {!showWatchlist && !currentMovie && !showSuggestions && loadingTopMovies && (
           <div className="mb-16 text-center">
             <p className="text-muted-foreground">Loading trending movies...</p>
           </div>
