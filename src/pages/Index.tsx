@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Film, BookmarkCheck } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { MovieCard } from "@/components/MovieCard";
@@ -23,6 +23,11 @@ interface Movie {
   imdbID: string;
 }
 
+interface TopMoviesGridProps {
+  movies: Movie[];
+  onMovieClick: (movie: Movie) => void;
+}
+
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentMovie, setCurrentMovie] = useState<Movie | null>(null);
@@ -34,7 +39,78 @@ const Index = () => {
     movieTitle: "",
     fallbackUrl: undefined as string | undefined,
   });
+  const [topMovies, setTopMovies] = useState<Movie[]>([]);
+  const [region, setRegion] = useState<string>("hollywood");
+  const [loadingTopMovies, setLoadingTopMovies] = useState(true);
   const { toast } = useToast();
+
+  const regionSearchTerms: Record<string, string[]> = {
+    bollywood: ["Hindi movies", "Bollywood blockbusters", "Indian cinema", "Aamir Khan", "Shah Rukh Khan"],
+    spanish: ["Spanish cinema", "Película española", "Spanish drama", "Almodóvar", "Spanish thriller"],
+    hollywood: ["Hollywood blockbusters", "Award winning movies", "Oscar winners", "Action movies", "Drama movies"],
+  };
+
+  useEffect(() => {
+    const detectLocationAndFetchMovies = async () => {
+      try {
+        const geoResponse = await fetch("https://ipapi.co/json/");
+        const geoData = await geoResponse.json();
+        const country = geoData.country_code?.toUpperCase() || "US";
+
+        let detectedRegion = "hollywood";
+        if (["IN"].includes(country)) {
+          detectedRegion = "bollywood";
+        } else if (["ES", "MX", "AR", "CO", "PE", "CL"].includes(country)) {
+          detectedRegion = "spanish";
+        }
+
+        setRegion(detectedRegion);
+        await fetchTopMoviesByRegion(detectedRegion);
+      } catch (error) {
+        console.error("Geolocation failed, defaulting to Hollywood:", error);
+        setRegion("hollywood");
+        await fetchTopMoviesByRegion("hollywood");
+      }
+    };
+
+    detectLocationAndFetchMovies();
+  }, []);
+
+  const fetchTopMoviesByRegion = async (selectedRegion: string) => {
+    setLoadingTopMovies(true);
+    const searchTerms = regionSearchTerms[selectedRegion] || regionSearchTerms.hollywood;
+    const movies: Movie[] = [];
+
+    try {
+      for (const term of searchTerms) {
+        if (movies.length >= 6) break;
+
+        const response = await fetch(
+          `https://www.omdbapi.com/?s=${encodeURIComponent(term)}&type=movie&apikey=${OMDB_API_KEY}`
+        );
+        const data = await response.json();
+
+        if (data.Search) {
+          for (const result of data.Search) {
+            if (movies.length >= 6) break;
+            const detailResponse = await fetch(
+              `https://www.omdbapi.com/?i=${result.imdbID}&apikey=${OMDB_API_KEY}`
+            );
+            const detailData = await detailResponse.json();
+            if (detailData.Poster && detailData.Poster !== "N/A") {
+              movies.push(detailData);
+            }
+          }
+        }
+      }
+
+      setTopMovies(movies);
+    } catch (error) {
+      console.error("Error fetching top movies:", error);
+    } finally {
+      setLoadingTopMovies(false);
+    }
+  };
 
   const searchMovie = async () => {
     if (!searchQuery.trim()) {
@@ -187,6 +263,11 @@ const Index = () => {
     }
   };
 
+  const handleTopMovieClick = (movie: Movie) => {
+    setCurrentMovie(movie);
+    setShowWatchlist(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
@@ -233,6 +314,51 @@ const Index = () => {
             apiKey={OMDB_API_KEY}
           />
         </div>
+
+        {/* Top Movies Section */}
+        {!showWatchlist && !currentMovie && topMovies.length > 0 && (
+          <div className="mb-16">
+            <h3 className="text-3xl font-bold mb-8 text-center animate-fade-in">
+              Trending Now
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {topMovies.map((movie) => (
+                <div
+                  key={movie.imdbID}
+                  className="group cursor-pointer transform transition-transform hover:scale-105"
+                  onClick={() => handleTopMovieClick(movie)}
+                >
+                  <div className="relative overflow-hidden rounded-lg shadow-lg">
+                    {movie.Poster && movie.Poster !== "N/A" ? (
+                      <img
+                        src={movie.Poster}
+                        alt={movie.Title}
+                        className="w-full h-80 object-cover group-hover:opacity-90 transition-opacity"
+                      />
+                    ) : (
+                      <div className="w-full h-80 bg-muted flex items-center justify-center">
+                        <span className="text-muted-foreground">No poster</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
+                      <h4 className="font-bold text-white text-lg mb-1">
+                        {movie.Title}
+                      </h4>
+                      <p className="text-sm text-gray-200">
+                        {movie.Year} • {movie.imdbRating}/10
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {!showWatchlist && !currentMovie && loadingTopMovies && (
+          <div className="mb-16 text-center">
+            <p className="text-muted-foreground">Loading trending movies...</p>
+          </div>
+        )}
 
         {/* Results Section */}
         {!showWatchlist && currentMovie && (
