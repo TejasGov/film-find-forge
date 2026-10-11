@@ -53,14 +53,14 @@ const Index = () => {
 
   return (
     <main className="h-screen overflow-hidden bg-background text-foreground">
-      <h1 className="sr-only">CineSearch — explore 100 great films and decide what to watch together</h1>
+      <h1 className="sr-only">WhatToWatch Tonight — explore 100 great films and decide what to watch together</h1>
       <PosterCanvas movies={MOVIES} onSelect={setSelected} />
 
       {/* Top bar */}
       <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex items-center justify-between p-5 md:px-8 md:py-6">
         <div className="pointer-events-auto flex items-baseline gap-3">
           <span className="font-display text-2xl tracking-tight">
-            Cine<span className="italic text-primary">search</span>
+            WhatToWatch <span className="italic text-primary">tonight</span>
           </span>
           <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground md:inline">Vol. 01 — {MOVIES.length} films</span>
         </div>

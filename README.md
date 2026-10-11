@@ -1,8 +1,10 @@
-# CineSearch (Film Find Forge)
+# WhatToWatch Tonight
+
+Live: https://whattowatch-tonight.lovable.app
 
 > *"My sister and I always had trouble deciding what to watch on movie nights. We'd scroll for hours, argue about genres, and eventually just give up or watch the same thing we always do. So, we thought: let's do this. Let's build something that actually helps you decide."* — *Tejas Govind*
 
-CineSearch is a modern, AI-powered movie discovery platform designed to eliminate the endless scroll and help you find exactly what you're in the mood for.
+WhatToWatch Tonight is a modern, AI-powered movie discovery platform designed to eliminate the endless scroll and help you find exactly what you're in the mood for.
 
 ## 🍿 Features
 
