@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ['"Instrument Serif"', 'serif'],
+        sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -55,6 +59,7 @@ export default {
       boxShadow: {
         'glow': 'var(--shadow-glow)',
         'card': 'var(--shadow-card)',
+        'poster': 'var(--shadow-poster)',
       },
       transitionTimingFunction: {
         'smooth': 'var(--transition-smooth)',
@@ -81,6 +86,11 @@ export default {
           from: { transform: "scale(0.95)", opacity: "0" },
           to: { transform: "scale(1)", opacity: "1" },
         },
+        shuffle: {
+          "0%, 100%": { transform: "translateY(0) rotate(0deg)", opacity: "0" },
+          "20%, 60%": { opacity: "1" },
+          "40%": { transform: "translateY(-14px) rotate(-6deg)" },
+        },
         "slide-up": {
           from: { transform: "translateY(10px)", opacity: "0" },
           to: { transform: "translateY(0)", opacity: "1" },
@@ -92,6 +102,7 @@ export default {
         "fade-in": "fade-in 0.5s ease-out",
         "scale-in": "scale-in 0.3s ease-out",
         "slide-up": "slide-up 0.4s ease-out",
+        shuffle: "shuffle 1s ease-in-out infinite",
       },
     },
   },
