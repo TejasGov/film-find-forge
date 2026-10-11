@@ -222,7 +222,7 @@ export const MovieNight = ({ movies, onClose, onTrailer, onAdd }: Props) => {
                 ))}
               </div>
               <h2 className="mt-10 font-display text-4xl">Weighing {crew.length} sets of taste…</h2>
-              <p className="mt-2 text-sm text-muted-foreground">Comparing every answer against 100 films.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Comparing every answer against every film.</p>
             </section>
           )}
 

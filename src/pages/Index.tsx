@@ -8,10 +8,10 @@ import { useWatchlist } from "@/hooks/use-watchlist";
 import { useTrailer } from "@/hooks/use-trailer";
 import { useLenis } from "@/hooks/use-lenis";
 import { searchMoviesLive } from "@/services/omdb";
-import top100 from "@/data/top100.json";
+import allMovies from "@/data/movies.json";
 import type { Movie } from "@/types/movie";
 
-const MOVIES = top100 as Movie[];
+const MOVIES = allMovies as Movie[];
 
 const Index = () => {
   const [selected, setSelected] = useState<Movie | null>(null);
