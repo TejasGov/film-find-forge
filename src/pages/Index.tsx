@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, Bookmark, ArrowRight } from "lucide-react";
 import { PosterCanvas } from "@/components/PosterCanvas";
 import { MovieSheet } from "@/components/MovieSheet";
 import { MovieNight } from "@/components/MovieNight";
@@ -20,7 +20,7 @@ const Index = () => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Movie[]>([]);
   const [searching, setSearching] = useState(false);
-  const { watchlist, showWatchlist, setShowWatchlist, addToWatchlist, loadWatchlist, removeFromWatchlist } = useWatchlist();
+  const { watchlist, ids, showWatchlist, setShowWatchlist, addToWatchlist, loadWatchlist, removeFromWatchlist } = useWatchlist();
   const { trailerModal, openTrailer, closeTrailer } = useTrailer();
 
   const wrap = useRef<HTMLDivElement>(null);
@@ -48,6 +48,8 @@ const Index = () => {
   const inList = watchlist.some((m) => m.imdbID === selected?.imdbID) && showWatchlist;
   const listOpen = showWatchlist;
   const grid = searchOpen ? results : watchlist;
+  const posterOf = new Map(MOVIES.map((m) => [m.imdbID, m.Poster]));
+  const thumbs = ids.slice(-3).map((id) => posterOf.get(id)).filter(Boolean) as string[];
 
   return (
     <main className="h-screen overflow-hidden bg-background text-foreground">
@@ -55,35 +57,66 @@ const Index = () => {
       <PosterCanvas movies={MOVIES} onSelect={setSelected} />
 
       {/* Top bar */}
-      <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex items-center justify-between p-5 md:p-7">
-        <div className="pointer-events-auto font-display text-2xl tracking-tight">
-          Cine<span className="italic text-primary">search</span>
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex items-center justify-between p-5 md:px-8 md:py-6">
+        <div className="pointer-events-auto flex items-baseline gap-3">
+          <span className="font-display text-2xl tracking-tight">
+            Cine<span className="italic text-primary">search</span>
+          </span>
+          <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground md:inline">Vol. 01 — {MOVIES.length} films</span>
         </div>
-        <nav className="pointer-events-auto flex items-center gap-1 rounded-full border border-border/70 bg-background/60 p-1 backdrop-blur-xl">
-          <button onClick={() => setSearchOpen(true)} className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground">
-            <Search className="h-4 w-4" /> Search <kbd className="hidden rounded border border-border px-1.5 text-[10px] md:inline">⌘K</kbd>
+        <nav className="pointer-events-auto flex items-center gap-2">
+          <button onClick={() => setSearchOpen(true)} className="inline-flex h-10 items-center gap-2.5 border border-foreground/15 bg-background/50 px-4 text-sm text-muted-foreground backdrop-blur-xl transition hover:border-foreground/40 hover:text-foreground">
+            <Search className="h-3.5 w-3.5" /> Search
+            <kbd className="hidden font-mono text-[10px] text-muted-foreground/70 md:inline">⌘K</kbd>
           </button>
-          <button onClick={loadWatchlist} className="rounded-full px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground">
-            My list
+          <button
+            onClick={() => loadWatchlist(MOVIES)}
+            className="group inline-flex h-10 items-center gap-3 border border-foreground/15 bg-background/50 pl-3 pr-4 backdrop-blur-xl transition hover:border-primary/60"
+            aria-label={`My list, ${ids.length} saved`}
+          >
+            <span className="relative flex h-6 items-center">
+              {thumbs.length ? (
+                thumbs.map((t, i) => (
+                  <img
+                    key={t}
+                    src={t}
+                    alt=""
+                    className="h-7 w-5 object-cover ring-1 ring-background transition-transform duration-300 group-hover:translate-x-0"
+                    style={{ marginLeft: i ? -8 : 0, transform: `rotate(${(i - 1) * 6}deg)`, zIndex: i }}
+                  />
+                ))
+              ) : (
+                <Bookmark className="h-4 w-4 text-muted-foreground transition group-hover:text-primary" />
+              )}
+            </span>
+            <span className="text-sm text-foreground">My list</span>
+            <span className="min-w-[1.5rem] border-l border-foreground/15 pl-3 font-mono text-xs tabular-nums text-primary">
+              {String(ids.length).padStart(2, "0")}
+            </span>
           </button>
         </nav>
       </header>
 
-      {/* Floating call to action */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center p-5 md:p-8">
-        <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-border/70 bg-background/70 p-6 shadow-poster backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-6 duration-1000 md:p-7">
-          <h2 className="font-display text-4xl leading-[1] md:text-5xl">
-            Stop scrolling. <span className="italic text-primary">Start watching.</span>
+      {/* Centered call to action */}
+      <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center p-5">
+        <div className="pointer-events-auto relative w-full max-w-md border border-foreground/15 bg-background/75 px-8 pb-8 pt-7 text-center shadow-poster backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-1000">
+          <span className="absolute -top-px left-1/2 h-px w-16 -translate-x-1/2 bg-primary" />
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Movie night · 5 questions</p>
+          <h2 className="mt-4 font-display text-5xl leading-[0.95]">
+            One film.<br />
+            <span className="italic text-primary">Everyone agrees.</span>
           </h2>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Everyone ranks five questions. We find the one film your whole group will love.
+          <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
+            Each person ranks five questions. We weigh every answer and pick the film your whole group will love.
           </p>
-          <div className="mt-5 flex items-center justify-between gap-4">
-            <button onClick={() => setNight(true)} className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:brightness-110">
-              Start movie night
-            </button>
-            <span className="text-xs text-muted-foreground">Drag to explore 100 films</span>
-          </div>
+          <button
+            onClick={() => setNight(true)}
+            className="group mt-7 inline-flex w-full items-center justify-between bg-primary px-5 py-3.5 text-sm font-medium text-primary-foreground transition hover:brightness-110"
+          >
+            Start the quiz
+            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+          </button>
+          <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">or drag to explore</p>
         </div>
       </div>
 
@@ -106,7 +139,7 @@ const Index = () => {
                     />
                   </>
                 ) : (
-                  <h2 className="flex-1 font-display text-4xl">My list</h2>
+                  <h2 className="flex-1 font-display text-4xl">My list <span className="font-mono text-sm text-muted-foreground">{String(ids.length).padStart(2, "0")}</span></h2>
                 )}
                 <button onClick={() => { setSearchOpen(false); setShowWatchlist(false); }} aria-label="Close" className="rounded-full p-2 text-muted-foreground hover:bg-secondary hover:text-foreground">
                   <X className="h-5 w-5" />
@@ -115,6 +148,9 @@ const Index = () => {
               {searchOpen && searching && <p className="mt-8 text-sm text-muted-foreground">Searching…</p>}
               {searchOpen && !searching && query.length >= 3 && results.length === 0 && (
                 <p className="mt-8 text-sm text-muted-foreground">Nothing found for “{query}”.</p>
+              )}
+              {!searchOpen && ids.length === 0 && (
+                <p className="mt-10 max-w-sm text-sm text-muted-foreground">Nothing saved yet. Open any poster and choose “My list” to keep it here.</p>
               )}
               <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-5">
                 {grid.map((m, i) => (
