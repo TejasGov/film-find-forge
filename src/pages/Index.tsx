@@ -59,8 +59,8 @@ const Index = () => {
       {/* Top bar */}
       <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex items-center justify-between p-5 md:px-8 md:py-6">
         <div className="pointer-events-auto flex items-baseline gap-3">
-          <span className="font-display text-2xl tracking-tight">WhatToWatch <span className="italic text-primary">tonight</span>{/*
-            */}
+          <span className="font-display text-2xl tracking-tight">
+            WhatToWatch <span className="italic text-primary">tonight</span>
           </span>
           <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground md:inline">Vol. 01 — {MOVIES.length} films</span>
         </div>
