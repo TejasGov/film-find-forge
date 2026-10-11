@@ -28,7 +28,7 @@ const Index = () => {
   useLenis(wrap, inner, searchOpen || showWatchlist);
 
   useEffect(() => {
-    if (query.trim().length < 3) return setResults([]);
+    if (query.trim().length < 3) { setSearching(false); return setResults([]); }
     setSearching(true);
     const t = setTimeout(() => {
       searchMoviesLive(query).then(setResults).catch(() => setResults([])).finally(() => setSearching(false));
@@ -39,7 +39,7 @@ const Index = () => {
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setSearchOpen(true); }
-      if (e.key === "Escape") { setSearchOpen(false); setShowWatchlist(false); setSelected(null); }
+      if (e.key === "Escape" && !document.querySelector("[role=dialog][data-state=open]")) { setSearchOpen(false); setShowWatchlist(false); setSelected(null); }
     };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
