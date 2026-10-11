@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { factsFor } from "@/data/facts";
 import { X, Plus, ArrowRight, ArrowLeft, RotateCcw, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { RANK_QUESTIONS } from "@/data/questions";
@@ -31,7 +32,32 @@ export const MovieNight = ({ movies, onClose, onTrailer, onAdd }: Props) => {
   const crew = names.map((n, i) => n.trim() || `Person ${i + 1}`);
   const q = RANK_QUESTIONS[qi];
   const current = all[person]?.[q?.id] ?? [];
-  const byId = useMemo(() => new Map(movies.map((m) => [m.imdbID, m])), [movies]);
+  const isTags = q?.kind === "tags";
+  const [draft, setDraft] = useState("");
+  const [facts, setFacts] = useState<string[]>([]);
+  const [fi, setFi] = useState(0);
+  useEffect(() => {
+    if (phase !== "deciding" || facts.length < 2) return;
+    const t = setInterval(() => setFi((i) => (i + 1) % facts.length), 5500);
+    return () => clearInterval(t);
+  }, [phase, facts.length]);
+
+  const addTag = (raw: string) => {
+    const t = raw.trim().replace(/\s+/g, " ").slice(0, 30);
+    if (!t || current.some((c) => c.toLowerCase() === t.toLowerCase()) || current.length >= 6) return setDraft("");
+    setAll((prev) => {
+      const next = [...prev];
+      next[person] = { ...(next[person] ?? {}), [q.id]: [...current, t[0].toUpperCase() + t.slice(1)] };
+      return next;
+    });
+    setDraft("");
+  };
+  const removeTag = (t: string) =>
+    setAll((prev) => {
+      const next = [...prev];
+      next[person] = { ...(next[person] ?? {}), [q.id]: current.filter((c) => c !== t) };
+      return next;
+    });
 
   const setOrder = (order: string[]) => {
     // auto-place the final remaining option
@@ -47,10 +73,12 @@ export const MovieNight = ({ movies, onClose, onTrailer, onAdd }: Props) => {
   const decide = async (rankings: Rankings[]) => {
     setPhase("deciding");
     setError(null);
+    setFacts(factsFor(rankings));
+    setFi(0);
     const { data, error } = await supabase.functions.invoke("decide", {
       body: {
         members: crew.map((name, i) => ({ name, rankings: rankings[i] })),
-        questions: RANK_QUESTIONS.map(({ id, prompt }) => ({ id, prompt })),
+        questions: RANK_QUESTIONS.map(({ id, prompt, kind }) => ({ id, prompt, kind: kind ?? "rank" })),
       },
     });
     let msg = data?.error as string | undefined;
@@ -67,14 +95,14 @@ export const MovieNight = ({ movies, onClose, onTrailer, onAdd }: Props) => {
       return;
     }
     setPicks(
-      (data.picks as { id: string; probability: number }[])
-        .map((p) => ({ movie: byId.get(p.id)!, probability: p.probability }))
-        .filter((p) => p.movie),
+      (data.picks as { movie: Movie; probability: number }[]).filter((p) => p.movie),
     );
     setPhase("result");
   };
 
   const next = () => {
+    if (isTags && draft.trim()) addTag(draft);
+    setDraft("");
     if (qi < RANK_QUESTIONS.length - 1) return setQi(qi + 1);
     if (person < crew.length - 1) {
       setPerson(person + 1);
@@ -118,7 +146,7 @@ export const MovieNight = ({ movies, onClose, onTrailer, onAdd }: Props) => {
             <section key="crew" className="my-auto py-16 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <h2 className="font-display text-6xl leading-[0.95] md:text-7xl">Who's watching?</h2>
               <p className="mt-4 max-w-md text-muted-foreground">
-                Everyone ranks five quick questions. We weigh every answer and find the one film you'll all enjoy.
+                Everyone answers five quick questions. We weigh every answer and find the one film you'll all enjoy.
               </p>
               <div className="mt-10 space-y-3">
                 {names.map((n, i) => (
@@ -162,6 +190,42 @@ export const MovieNight = ({ movies, onClose, onTrailer, onAdd }: Props) => {
               </p>
               <h2 className="mt-3 font-display text-5xl leading-[1] md:text-6xl">{q.prompt}</h2>
               <p className="mt-3 text-sm text-muted-foreground">{q.hint}</p>
+              {isTags ? (
+                <div className="mt-10">
+                  <form
+                    onSubmit={(e) => { e.preventDefault(); addTag(draft); }}
+                    className="flex items-center gap-3 border-b border-border pb-3 focus-within:border-primary/60"
+                  >
+                    <input
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder={q.placeholder}
+                      aria-label="Language"
+                      className="flex-1 bg-transparent font-display text-3xl outline-none placeholder:text-muted-foreground/40"
+                    />
+                    <button type="submit" disabled={!draft.trim()} className="inline-flex items-center gap-2 border border-foreground/15 px-4 py-2 text-sm transition hover:border-primary/60 disabled:opacity-30">
+                      <Plus className="h-4 w-4" /> Add
+                    </button>
+                  </form>
+                  <div className="mt-5 flex min-h-10 flex-wrap gap-2">
+                    {current.length === 0 && <span className="text-sm text-muted-foreground">No languages yet — any language is fine.</span>}
+                    {current.map((t) => (
+                      <span key={t} className="inline-flex items-center gap-2 border border-primary/60 bg-primary/10 py-1.5 pl-3 pr-2 text-sm animate-in zoom-in-95">
+                        {t}
+                        <button onClick={() => removeTag(t)} aria-label={`Remove ${t}`} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-8 flex flex-wrap gap-2">
+                    {q.suggestions?.filter((sug) => !current.includes(sug)).map((sug) => (
+                      <button key={sug} onClick={() => addTag(sug)} className="border border-dashed border-foreground/20 px-3 py-1.5 text-xs text-muted-foreground transition hover:border-foreground/40 hover:text-foreground">
+                        + {sug}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
               <div className="mt-10 grid gap-2.5">
                 {q.options.map((o) => {
                   const rank = current.indexOf(o);
@@ -186,18 +250,19 @@ export const MovieNight = ({ movies, onClose, onTrailer, onAdd }: Props) => {
                   );
                 })}
               </div>
+              )}
               {error && <p className="mt-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>}
               <div className="mt-10 flex items-center justify-between">
                 <button onClick={back} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
                 <div className="flex items-center gap-4">
-                  {current.length > 0 && (
+                  {current.length > 0 && !isTags && (
                     <button onClick={() => setOrder([])} className="text-sm text-muted-foreground hover:text-foreground">Clear</button>
                   )}
                   <button
                     onClick={next}
-                    disabled={current.length !== q.options.length}
+                    disabled={!isTags && current.length !== q.options.length}
                     className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:brightness-110 disabled:opacity-30"
                   >
                     {step === totalSteps ? "Decide" : person < crew.length - 1 && qi === RANK_QUESTIONS.length - 1 ? `Pass to ${crew[person + 1]}` : "Next"}
@@ -222,7 +287,13 @@ export const MovieNight = ({ movies, onClose, onTrailer, onAdd }: Props) => {
                 ))}
               </div>
               <h2 className="mt-10 font-display text-4xl">Weighing {crew.length} sets of taste…</h2>
-              <p className="mt-2 text-sm text-muted-foreground">Comparing every answer against every film.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Searching the full OMDb catalogue, then Jev picks one.</p>
+              {facts[fi] && (
+                <div className="mt-12 max-w-lg border-t border-border pt-6">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-primary">While you wait</p>
+                  <p key={fi} className="mt-3 font-display text-2xl leading-snug animate-in fade-in slide-in-from-bottom-2 duration-700">{facts[fi]}</p>
+                </div>
+              )}
             </section>
           )}
 
