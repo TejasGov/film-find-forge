@@ -1,8 +1,8 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
-const TITLE = "Page not found — CineSearch";
-const DESC = "This page doesn't exist. Head back to CineSearch to explore 150 films and pick one your whole group will enjoy.";
+const TITLE = "Page not found — WhatToWatch Tonight";
+const DESC = "This page doesn't exist. Head back to WhatToWatch Tonight to explore 150 films and pick one your whole group will enjoy.";
 
 const setMeta = (attr: "name" | "property", key: string, value: string) => {
   let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
