@@ -10,17 +10,17 @@ const STAGGER = 150;
 interface Props {
   movies: Movie[];
   onSelect: (m: Movie) => void;
-  onMove?: (x: number, y: number) => void;
 }
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 /** Roughly one in three posters carries the pixel-bloom hover. */
 const blooms = (i: number) => (i * 7) % 3 === 0;
 
-export const PosterCanvas = ({ movies, onSelect, onMove }: Props) => {
+export const PosterCanvas = ({ movies, onSelect }: Props) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const moved = useRef(0);
+  const readout = useRef<HTMLSpanElement>(null);
 
   const rows = Math.ceil(movies.length / COLS);
   const tileW = COLS * (W + GAP);
@@ -61,7 +61,8 @@ export const PosterCanvas = ({ movies, onSelect, onMove }: Props) => {
         el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${1 - d * 0.12})`;
         el.style.opacity = String(1 - d * 0.6);
       });
-      if (onMove && ++frame % 6 === 0) onMove(Math.round(-cur.x), Math.round(-cur.y));
+      if (readout.current && ++frame % 4 === 0)
+        readout.current.textContent = `X ${String(Math.round(-cur.x)).padStart(5, "0")}  Y ${String(Math.round(-cur.y)).padStart(5, "0")}`;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -104,7 +105,7 @@ export const PosterCanvas = ({ movies, onSelect, onMove }: Props) => {
       window.removeEventListener("pointerup", up);
       root.removeEventListener("wheel", wheel);
     };
-  }, [tileW, tileH, onMove]);
+  }, [tileW, tileH]);
 
   return (
     <div ref={rootRef} className="fixed inset-0 overflow-hidden cursor-grab touch-none select-none data-[dragging=true]:cursor-grabbing">
@@ -150,6 +151,7 @@ export const PosterCanvas = ({ movies, onSelect, onMove }: Props) => {
       })}
       <div className="pointer-events-none absolute inset-0 bg-vignette" />
       <div className="grain pointer-events-none absolute inset-0" />
+      <span ref={readout} className="pointer-events-none fixed bottom-6 left-6 z-30 hidden font-mono text-[10px] tracking-[0.2em] text-muted-foreground md:block" />
     </div>
   );
 };

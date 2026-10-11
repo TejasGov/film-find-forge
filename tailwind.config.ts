@@ -15,6 +15,7 @@ export default {
     extend: {
       fontFamily: {
         display: ['"Instrument Serif"', 'serif'],
+        mono: ['"Geist Mono"', 'ui-monospace', 'monospace'],
         sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
