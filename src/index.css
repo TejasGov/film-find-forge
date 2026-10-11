@@ -79,7 +79,7 @@
 
   /* Pixel bloom: a pixelated, saturated copy glows out from behind the poster */
   .bloom-layer {
-    filter: url(#pixelate) saturate(1.8) brightness(1.15);
+    filter: url(#pixelate) saturate(2) brightness(1.5);
     opacity: 0;
     transform: scale(0.96);
     mix-blend-mode: screen;
@@ -89,7 +89,7 @@
   }
   .group:hover .bloom-layer {
     opacity: 0.9;
-    transform: scale(1.32);
+    transform: scale(1.42);
   }
   /* brief pixel dissolve on the poster face when hover begins */
   .pixel-flash {
