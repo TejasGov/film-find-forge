@@ -162,12 +162,15 @@ export const PosterCanvas = ({ movies, onSelect }: Props) => {
         </filter>
       </svg>
 
+      <div className="absolute inset-0" style={{ perspective: 1400 }}>
+      <div ref={stageRef} className="absolute inset-0 will-change-transform" style={{ transformStyle: "preserve-3d" }}>
       {movies.map((m, i) => {
         const bloom = blooms(i);
         return (
           <button
             key={m.imdbID}
             ref={(el) => (itemRefs.current[i] = el)}
+            data-poster={i}
             onClick={() => moved.current < 6 && onSelect(m)}
             className="group absolute left-0 top-0 text-left will-change-transform"
             style={{ width: W }}
@@ -177,7 +180,7 @@ export const PosterCanvas = ({ movies, onSelect }: Props) => {
               {bloom && (
                 <img src={m.Poster} alt="" draggable={false} aria-hidden className="bloom-layer pointer-events-none absolute inset-0 h-full w-full object-cover" />
               )}
-              <div className="relative h-full w-full overflow-hidden bg-card shadow-poster ring-1 ring-foreground/10 transition-transform duration-500 ease-out group-hover:-translate-y-1">
+              <div className="relative h-full w-full overflow-hidden bg-card shadow-poster ring-1 ring-foreground/10 transition-shadow duration-500 group-hover:shadow-glow">
                 <img src={m.Poster} alt="" draggable={false} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 {bloom && (
                   <img src={m.Poster} alt="" draggable={false} aria-hidden className="pixel-flash pointer-events-none absolute inset-0 h-full w-full object-cover" />
@@ -191,6 +194,8 @@ export const PosterCanvas = ({ movies, onSelect }: Props) => {
           </button>
         );
       })}
+      </div>
+      </div>
       <div className="pointer-events-none absolute inset-0 bg-vignette" />
       <div className="grain pointer-events-none absolute inset-0" />
       <span ref={readout} className="pointer-events-none fixed bottom-6 left-6 z-30 hidden font-mono text-[10px] tracking-[0.2em] text-muted-foreground md:block" />
