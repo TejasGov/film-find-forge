@@ -29,21 +29,42 @@ export async function fetchMoviesByTerms(terms: string[]): Promise<Movie[]> {
   return movies;
 }
 
+type Hit = { Title: string; Year: string; imdbID: string; Poster: string };
+
+// Exact title matches first, then titles that start with the query, then newest first.
+export function rankHits(query: string, hits: Hit[]): Hit[] {
+  const q = query.trim().toLowerCase();
+  const score = (t: string) => {
+    const s = t.toLowerCase();
+    return s === q ? 3 : s.startsWith(q) ? 2 : s.includes(q) ? 1 : 0;
+  };
+  const year = (y: string) => parseInt(y, 10) || 0;
+  return [...hits].sort((a, b) => score(b.Title) - score(a.Title) || year(b.Year) - year(a.Year));
+}
+
 export async function searchMoviesLive(query: string): Promise<Movie[]> {
-  // Append a wildcard to allow partial matches (e.g. "dilwal" -> "dilwal*")
-  const searchQuery = query.trim() + '*';
-  const res = await fetch(`${BASE}/?s=${encodeURIComponent(searchQuery)}&type=movie&apikey=${OMDB_API_KEY}`);
-  const data = await res.json();
-  if (data.Response === "True" && data.Search) {
-    // Only take top 10 to avoid too many requests
-    const basicResults = data.Search.slice(0, 10);
-    // Fetch details for each to get accurate poster/rating/plot for the cards
-    const detailedPromises = basicResults.map(async (m: any) => {
-      const detailRes = await fetch(`${BASE}/?i=${m.imdbID}&apikey=${OMDB_API_KEY}`);
-      return detailRes.json();
-    });
-    const detailedResults = await Promise.all(detailedPromises);
-    return detailedResults.filter(detail => detail.Poster && detail.Poster !== "N/A");
+  // OMDb returns 10 results per page in no useful order, so popular new films
+  // (e.g. "Ramayana" 2026) can sit on page 2. Fetch the first 3 pages and rank them ourselves.
+  const q = encodeURIComponent(query.trim());
+  const pages = await Promise.all(
+    [1, 2, 3].map((p) =>
+      fetch(`${BASE}/?s=${q}&type=movie&page=${p}&apikey=${OMDB_API_KEY}`)
+        .then((r) => r.json())
+        .catch(() => null),
+    ),
+  );
+  const seen = new Set<string>();
+  const hits: Hit[] = [];
+  for (const d of pages) {
+    for (const m of (d?.Search ?? []) as Hit[]) {
+      if (seen.has(m.imdbID) || !m.Poster || m.Poster === "N/A") continue;
+      seen.add(m.imdbID);
+      hits.push(m);
+    }
   }
-  return [];
+  const top = rankHits(query, hits).slice(0, 15);
+  const detailed = await Promise.all(
+    top.map((m) => fetch(`${BASE}/?i=${m.imdbID}&apikey=${OMDB_API_KEY}`).then((r) => r.json()).catch(() => null)),
+  );
+  return detailed.filter((d) => d && d.Response === "True" && d.Poster && d.Poster !== "N/A");
 }
