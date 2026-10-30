@@ -7,7 +7,7 @@ import { TrailerModal } from "@/components/TrailerModal";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { useTrailer } from "@/hooks/use-trailer";
 import { useLenis } from "@/hooks/use-lenis";
-import { searchMoviesLive } from "@/services/omdb";
+import { searchMovies } from "@/services/search";
 import allMovies from "@/data/movies.json";
 import type { Movie } from "@/types/movie";
 
@@ -30,13 +30,19 @@ const Index = () => {
   const inner = useRef<HTMLDivElement>(null);
   useLenis(wrap, inner, searchOpen || showWatchlist);
 
+  const [searchError, setSearchError] = useState(false);
   useEffect(() => {
-    if (query.trim().length < 3) { setSearching(false); return setResults([]); }
+    if (query.trim().length < 2) { setSearching(false); setSearchError(false); return setResults([]); }
     setSearching(true);
+    // Each keystroke cancels the previous search so an older, slower reply can never overwrite newer results.
+    const ctrl = new AbortController();
     const t = setTimeout(() => {
-      searchMoviesLive(query).then(setResults).catch(() => setResults([])).finally(() => setSearching(false));
-    }, 350);
-    return () => clearTimeout(t);
+      searchMovies(query, ctrl.signal)
+        .then((r) => { if (!ctrl.signal.aborted) { setResults(r); setSearchError(false); } })
+        .catch(() => { if (!ctrl.signal.aborted) { setResults([]); setSearchError(true); } })
+        .finally(() => { if (!ctrl.signal.aborted) setSearching(false); });
+    }, 250);
+    return () => { clearTimeout(t); ctrl.abort(); };
   }, [query]);
 
   useEffect(() => {
@@ -148,8 +154,11 @@ const Index = () => {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              {searchOpen && searching && <p className="mt-8 text-sm text-muted-foreground">Searching…</p>}
-              {searchOpen && !searching && query.length >= 3 && results.length === 0 && (
+              {searchOpen && searching && results.length === 0 && <p className="mt-8 text-sm text-muted-foreground">Searching…</p>}
+              {searchOpen && !searching && searchError && (
+                <p className="mt-8 text-sm text-muted-foreground">Search couldn’t reach the movie database. Check your connection and try again.</p>
+              )}
+              {searchOpen && !searching && !searchError && query.trim().length >= 2 && results.length === 0 && (
                 <p className="mt-8 text-sm text-muted-foreground">Nothing found for “{query}”.</p>
               )}
               {!searchOpen && ids.length === 0 && (
