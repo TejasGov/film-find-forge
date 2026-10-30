@@ -20,6 +20,9 @@ const Index = () => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Movie[]>([]);
   const [searching, setSearching] = useState(false);
+  // Posters whose image link is dead on IMDb's side; their cards are hidden.
+  const [broken, setBroken] = useState<Set<string>>(new Set());
+  const markBroken = (url: string) => setBroken((s) => (s.has(url) ? s : new Set(s).add(url)));
   const { watchlist, ids, showWatchlist, setShowWatchlist, addToWatchlist, loadWatchlist, removeFromWatchlist } = useWatchlist();
   const { trailerModal, openTrailer, closeTrailer } = useTrailer();
 
@@ -153,13 +156,14 @@ const Index = () => {
                 <p className="mt-10 max-w-sm text-sm text-muted-foreground">Nothing saved yet. Open any poster and choose “My list” to keep it here.</p>
               )}
               <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-5">
-                {grid.map((m, i) => (
+                {grid.filter((m) => !broken.has(m.Poster)).map((m, i) => (
                   <button key={m.imdbID} onClick={() => setSelected(m)} className="group text-left animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${i * 40}ms`, animationFillMode: "both" }}>
                     <div className="overflow-hidden rounded-md ring-1 ring-border">
                       <img
                         src={m.Poster}
                         alt=""
-                        onError={(e) => { const card = e.currentTarget.closest("button"); if (card) card.style.display = "none"; }}
+                        ref={(el) => { if (el && el.complete && el.naturalWidth === 0) markBroken(m.Poster); }}
+                        onError={() => markBroken(m.Poster)}
                         className="aspect-[2/3] w-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
                     </div>
