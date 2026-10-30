@@ -156,7 +156,12 @@ const Index = () => {
                 {grid.map((m, i) => (
                   <button key={m.imdbID} onClick={() => setSelected(m)} className="group text-left animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${i * 40}ms`, animationFillMode: "both" }}>
                     <div className="overflow-hidden rounded-md ring-1 ring-border">
-                      <img src={m.Poster} alt="" className="aspect-[2/3] w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                      <img
+                        src={m.Poster}
+                        alt=""
+                        onError={(e) => { const card = e.currentTarget.closest("button"); if (card) card.style.display = "none"; }}
+                        className="aspect-[2/3] w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
                     </div>
                     <p className="mt-2 font-display text-lg leading-tight">{m.Title}</p>
                     <p className="text-xs text-muted-foreground">{m.Year}</p>
