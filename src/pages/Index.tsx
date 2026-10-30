@@ -154,8 +154,11 @@ const Index = () => {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              {searchOpen && searching && <p className="mt-8 text-sm text-muted-foreground">Searching…</p>}
-              {searchOpen && !searching && query.length >= 3 && results.length === 0 && (
+              {searchOpen && searching && results.length === 0 && <p className="mt-8 text-sm text-muted-foreground">Searching…</p>}
+              {searchOpen && !searching && searchError && (
+                <p className="mt-8 text-sm text-muted-foreground">Search couldn’t reach the movie database. Check your connection and try again.</p>
+              )}
+              {searchOpen && !searching && !searchError && query.trim().length >= 2 && results.length === 0 && (
                 <p className="mt-8 text-sm text-muted-foreground">Nothing found for “{query}”.</p>
               )}
               {!searchOpen && ids.length === 0 && (
